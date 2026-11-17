@@ -6,6 +6,7 @@
 //   link-tags    a conyr.ai link lacks the tags of the place it sits in
 //   link-status  a conyr.ai link does not answer 200
 //   deny         (only with --deny <file>) a file holds a term from that list, one term per line
+//   key          a file holds something shaped like a Conyr API key (Conyr's shared demo key lives in the conyr tool)
 //
 // Usage: tools/check [repository directory] [--deny <file>]
 // Needs Node 18 or later and network access. Exit 0: no problem. Exit 1: problems, one per line. Exit 2: could not run.
@@ -25,6 +26,7 @@ const PLACES = {
 };
 const ROUTE_RE = /\/v1(?:\/(?:[A-Za-z0-9_.$-]|\{[A-Za-z0-9_]+\}|<[A-Za-z0-9_ -]+>)+)+/g;
 const URL_RE = /https?:\/\/(?:[A-Za-z0-9._~:/?#@!$&*+,;=%-]|<[A-Za-z0-9_ -]+>|\{[A-Za-z0-9_]+\})+/g;
+const KEY_RE = /conyr_live_[A-Za-z0-9_-]{20,}/g;
 
 const problems = [];
 const seen = new Set();
@@ -255,6 +257,14 @@ function checkDeny(rel, text, re) {
   for (const m of text.matchAll(re)) problem('deny', rel, lineAt(text, m.index), `"${m[1]}"`);
 }
 
+// --- key ----------------------------------------------------------------------------------------------------------
+
+function checkKey(rel, text) {
+  for (const m of text.matchAll(KEY_RE)) {
+    problem('key', rel, lineAt(text, m.index), `a Conyr key (${m[0].slice(0, 16)}...); no key belongs in this repository`);
+  }
+}
+
 // --- main ---------------------------------------------------------------------------------------------------------
 
 async function main() {
@@ -301,6 +311,7 @@ async function main() {
     }
     if (rel === 'README.md' || rel === 'server.json' || rel.startsWith('skills/')) checkLinks(rel, text, toFetch);
     if (denyRe) checkDeny(rel, text, denyRe);
+    checkKey(rel, text);
   }
 
   const hrefs = [...toFetch.keys()];

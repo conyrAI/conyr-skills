@@ -13,14 +13,14 @@ One skill only: `npx skills add conyrai/conyr-skills --skill conyr-token-check`
 
 ## Try it now
 
-A coin's bundle summary (BONK here), with Conyr's shared demo key:
+A coin check (BONK here), with no key and nothing to set up besides Node.js 22 or later:
 
 ```bash
-curl -sS -H "Authorization: Bearer conyr_live_Yei4BniFsxwp8U63lv5pe-lwOuAfgF_E" "https://api.conyr.ai/v1/token/DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263/bundles/summary"
+npx -y conyr-cli token DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
 ```
 
-The demo key is printed here on purpose. It is an ordinary free key shared by everyone who uses these skills, and it
-reaches only the two free coin routes. When it is busy, a free key of your own takes a minute.
+Without a key, the tool uses Conyr's shared demo key: an ordinary free key shared by everyone without a key of their
+own, which reaches only the two free coin routes. When it is busy, a free key of your own takes a minute.
 
 ## The skills
 
@@ -31,7 +31,8 @@ reaches only the two free coin routes. When it is busy, a free key of your own t
 | [`conyr-coordination`](skills/conyr-coordination/SKILL.md) | Layer 3 | Who is behind this coin, and who moves with this wallet? |
 | [`conyr-api`](skills/conyr-api/SKILL.md) | Any | For an agent writing code against Conyr: addresses, plans, the OpenAPI contract, MCP and WebSocket setup, error bodies. |
 
-Each skill calls `https://api.conyr.ai` with `curl`. Nothing else to install.
+`conyr-token-check` runs Conyr's command-line tool through `npx` (Node.js 22 or later). The other skills call
+`https://api.conyr.ai` with `curl`. The tool: https://www.npmjs.com/package/conyr-cli
 
 ## Your own key
 

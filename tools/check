@@ -1,0 +1,330 @@
+#!/usr/bin/env node
+// Run before every release of this repository. It fails when:
+//   format       a skills/<name>/SKILL.md breaks the Agent Skills format (https://agentskills.io/specification)
+//   route        a /v1 route named in a skill or in the README is missing from Conyr's live OpenAPI file
+//   plan         a skill names a /v1 route without its plan, or with a plan the OpenAPI file does not give it
+//   link-tags    a conyr.ai link lacks the tags of the place it sits in
+//   link-status  a conyr.ai link does not answer 200
+//   deny         (only with --deny <file>) a file holds a term from that list, one term per line
+//
+// Usage: tools/check [repository directory] [--deny <file>]
+// Needs Node 18 or later and network access. Exit 0: no problem. Exit 1: problems, one per line. Exit 2: could not run.
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+
+const OPENAPI_URL = 'https://docs.conyr.ai/openapi.yaml';
+const PLANS = ['Free', 'Layer 1', 'Layer 2', 'Layer 3'];
+// Addresses an agent calls, not pages a person opens: no tags, and no status check (they need a key).
+const ENDPOINTS = new Set(['api.conyr.ai', 'mcp.conyr.ai']);
+// Fills a placeholder (<mint>, {address}, $MINT) when a link is fetched: USDC's mint.
+const EXAMPLE = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const PLACES = {
+  'README.md': { utm_source: 'github', utm_medium: 'readme', utm_content: 'conyr-skills' },
+  'server.json': { utm_source: 'mcp-registry', utm_medium: 'listing' },
+};
+const ROUTE_RE = /\/v1(?:\/(?:[A-Za-z0-9_.$-]|\{[A-Za-z0-9_]+\}|<[A-Za-z0-9_ -]+>)+)+/g;
+const URL_RE = /https?:\/\/(?:[A-Za-z0-9._~:/?#@!$&*+,;=%-]|<[A-Za-z0-9_ -]+>|\{[A-Za-z0-9_]+\})+/g;
+
+const problems = [];
+const seen = new Set();
+function problem(rule, file, line, message, key = `${file}:${line}:${message}`) {
+  if (seen.has(`${rule}|${key}`)) return;
+  seen.add(`${rule}|${key}`);
+  problems.push(`${rule}: ${file}:${line}: ${message}`);
+}
+
+function stop(message) {
+  console.error(`check: ${message}`);
+  process.exit(2);
+}
+
+function parseArgs(argv) {
+  const args = { root: path.resolve(__dirname, '..'), deny: null };
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--deny') {
+      args.deny = argv[++i];
+      if (!args.deny) stop('--deny needs a file');
+    } else if (argv[i].startsWith('-')) {
+      stop(`unknown option ${argv[i]}\nusage: tools/check [repository directory] [--deny <file>]`);
+    } else {
+      args.root = path.resolve(argv[i]);
+    }
+  }
+  return args;
+}
+
+function files(dir, root, out = []) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === '.git' || e.name === 'node_modules') continue;
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) files(p, root, out);
+    else if (e.isFile()) out.push(path.relative(root, p).split(path.sep).join('/'));
+  }
+  return out.sort();
+}
+
+const lineAt = (text, index) => text.slice(0, index).split('\n').length;
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const chars = (s) => [...s].length;
+
+// --- format -------------------------------------------------------------------------------------------------------
+
+function frontmatter(rel, text) {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(text);
+  if (!m) {
+    problem('format', rel, 1, 'no frontmatter: the file must open with a --- line, the fields and a closing --- line');
+    return null;
+  }
+  const fields = {};
+  m[1].split(/\r?\n/).forEach((line, i) => {
+    const n = i + 2;
+    if (!line.trim() || /^\s/.test(line) || line.startsWith('#')) return;
+    const kv = /^([A-Za-z][\w-]*):(?:\s+(.*))?$/.exec(line);
+    if (!kv) return problem('format', rel, n, 'a frontmatter line that is not "key: value"');
+    let value = (kv[2] ?? '').trim();
+    if (/^[|>][+-]?$/.test(value)) return problem('format', rel, n, `write ${kv[1]} on one line`);
+    if (/^".*"$/.test(value)) {
+      try {
+        value = JSON.parse(value);
+      } catch {
+        problem('format', rel, n, `${kv[1]} has a double-quoted value that does not parse`);
+      }
+    } else if (/^'.*'$/.test(value)) {
+      value = value.slice(1, -1).replace(/''/g, "'");
+    } else if (/: |\s#|:$/.test(value) || /^[[\]{}&*!%@`|>'"#,?-]/.test(value)) {
+      problem('format', rel, n, `quote the value of ${kv[1]}: as written it is not valid YAML`);
+    }
+    fields[kv[1]] = { value, line: n };
+  });
+  return fields;
+}
+
+function checkFormat(rel, text) {
+  const folder = rel.split('/')[1];
+  const f = frontmatter(rel, text);
+  if (!f) return;
+  const name = f.name?.value;
+  if (!name) problem('format', rel, 1, 'no name');
+  else {
+    if (chars(name) > 64) problem('format', rel, f.name.line, `name is ${chars(name)} characters, over 64`);
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
+      problem('format', rel, f.name.line, 'name may hold only lowercase letters, digits and single hyphens, and may not start or end with a hyphen');
+    }
+    if (name !== folder) problem('format', rel, f.name.line, `name "${name}" differs from its folder "${folder}"`);
+  }
+  const description = f.description?.value;
+  if (!description) problem('format', rel, 1, 'no description');
+  else if (chars(description) > 1024) {
+    problem('format', rel, f.description.line, `description is ${chars(description)} characters, over 1,024`);
+  }
+  const compatibility = f.compatibility?.value;
+  if (!compatibility) {
+    problem('format', rel, 1, 'no compatibility line (say it needs a shell with curl and network access to api.conyr.ai)');
+  } else if (chars(compatibility) > 500) {
+    problem('format', rel, f.compatibility.line, `compatibility is ${chars(compatibility)} characters, over 500`);
+  }
+}
+
+// --- route and plan -----------------------------------------------------------------------------------------------
+
+// The GET operations under paths: in the OpenAPI file, with their x-tier. A small reader for this file's layout,
+// so the check needs nothing installed.
+function readOpenapi(yaml) {
+  const tiers = new Map();
+  let inPaths = false;
+  let route = null;
+  let method = null;
+  for (const line of yaml.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    if (/^\S/.test(line)) {
+      inPaths = /^paths:\s*$/.test(line);
+      route = method = null;
+      continue;
+    }
+    if (!inPaths) continue;
+    let m;
+    if ((m = /^ {2}(['"]?)(\/[^'"\s]*)\1:\s*$/.exec(line))) [route, method] = [m[2], null];
+    else if ((m = /^ {4}([a-z]+):\s*$/.exec(line))) method = m[1];
+    else if (route && method === 'get' && (m = /^ {6}x-tier:\s*['"]?([^'"#]+?)['"]?\s*(?:#.*)?$/.exec(line))) {
+      tiers.set(route, m[1]);
+    }
+  }
+  return [...tiers]
+    .filter(([route]) => route.startsWith('/v1/'))
+    .map(([route, tier]) => {
+      const parts = route.split('/').slice(1);
+      const re = parts.map((p) => (/^\{[^}]+\}$/.test(p) ? '[^/]+' : escapeRe(p))).join('/');
+      return { route, tier, re: new RegExp(`^/${re}$`), literal: parts.filter((p) => !p.startsWith('{')).length };
+    });
+}
+
+// The OpenAPI route a written path stands for. A literal segment beats a parameter, as in the API's router.
+function routeOf(routes, written) {
+  let best = null;
+  for (const r of routes) if (r.re.test(written) && (!best || r.literal > best.literal)) best = r;
+  return best;
+}
+
+function mentions(text) {
+  return [...text.matchAll(ROUTE_RE)].map((m) => ({ written: m[0].replace(/\.+$/, ''), line: lineAt(text, m.index) }));
+}
+
+function checkRoutes(rel, text, routes, isSkill) {
+  const table = new Map();
+  if (isSkill) {
+    text.split('\n').forEach((line, i) => {
+      if (!line.trim().startsWith('|')) return;
+      const cells = line.split('|').slice(1, -1).map((c) => c.replace(/[`*]/g, '').trim());
+      const plan = cells.find((c) => PLANS.includes(c));
+      if (!plan) return;
+      for (const { written } of mentions(line)) {
+        const r = routeOf(routes, written);
+        if (!r) continue; // reported below as a mention
+        table.set(r.route, plan);
+        if (plan !== r.tier) {
+          problem('plan', rel, i + 1, `${r.route} is stated as ${plan}, the OpenAPI file says ${r.tier}`);
+        }
+      }
+    });
+  }
+  for (const { written, line } of mentions(text)) {
+    const r = routeOf(routes, written);
+    if (!r) problem('route', rel, line, `${written} is not in ${OPENAPI_URL}`, written);
+    else if (isSkill && !table.has(r.route)) {
+      problem('plan', rel, line, `${r.route} is named without its plan: add a table row with it and ${r.tier}`, r.route);
+    }
+  }
+}
+
+// --- links --------------------------------------------------------------------------------------------------------
+
+function placeOf(rel) {
+  if (PLACES[rel]) return PLACES[rel];
+  const m = /^skills\/([^/]+)\//.exec(rel);
+  return m ? { utm_source: 'skill', utm_medium: 'agent', utm_content: m[1] } : null;
+}
+
+const tagText = (tags) => Object.entries(tags).map(([k, v]) => `${k}=${v}`).join('&');
+const sorted = (tags) => Object.fromEntries(Object.entries(tags).sort(([a], [b]) => a.localeCompare(b)));
+
+function checkLinks(rel, text, toFetch) {
+  for (const m of text.matchAll(URL_RE)) {
+    const written = m[0].replace(/[.,;:!?*]+$/, '');
+    const line = lineAt(text, m.index);
+    let url;
+    try {
+      url = new URL(written.replace(/<[^>]+>|\{[A-Za-z0-9_]+\}|\$\{?[A-Z_]+\}?/g, EXAMPLE));
+    } catch {
+      problem('link-status', rel, line, `not a valid address: ${written}`);
+      continue;
+    }
+    if (url.hostname !== 'conyr.ai' && !url.hostname.endsWith('.conyr.ai')) continue;
+    if (ENDPOINTS.has(url.hostname)) continue;
+    // A file for machines (the OpenAPI contract, llms.txt) runs no script, so tags would count nothing.
+    if (!/\.(ya?ml|json|txt|md)$/i.test(url.pathname)) {
+      const want = placeOf(rel);
+      const got = Object.fromEntries([...url.searchParams].filter(([k]) => k.startsWith('utm_')));
+      if (!want) problem('link-tags', rel, line, `no place is known for links in this file: ${written}`);
+      else if (tagText(sorted(got)) !== tagText(sorted(want))) {
+        problem('link-tags', rel, line, `${written} must carry exactly ${tagText(want)}`);
+      }
+    }
+    if (!toFetch.has(url.href)) toFetch.set(url.href, []);
+    toFetch.get(url.href).push({ rel, line, written });
+  }
+}
+
+async function statusOf(href) {
+  try {
+    const r = await fetch(href, {
+      redirect: 'manual',
+      headers: { 'user-agent': 'conyr-skills-check' },
+      signal: AbortSignal.timeout(20000),
+    });
+    await r.arrayBuffer().catch(() => null);
+    return r.status;
+  } catch (e) {
+    return `no answer (${e.cause?.code ?? e.name})`;
+  }
+}
+
+// --- deny ---------------------------------------------------------------------------------------------------------
+
+function checkDeny(rel, text, re) {
+  for (const m of text.matchAll(re)) problem('deny', rel, lineAt(text, m.index), `"${m[1]}"`);
+}
+
+// --- main ---------------------------------------------------------------------------------------------------------
+
+async function main() {
+  const { root, deny } = parseArgs(process.argv.slice(2));
+  if (!fs.existsSync(path.join(root, 'skills'))) stop(`no skills folder in ${root}`);
+  let denyRe = null;
+  let denyCount = 0;
+  if (deny) {
+    let terms;
+    try {
+      terms = fs.readFileSync(deny, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+    } catch (e) {
+      stop(`cannot read the deny list ${deny}: ${e.message}`);
+    }
+    denyCount = terms.length;
+    if (terms.length) {
+      const alt = terms.sort((a, b) => b.length - a.length).map(escapeRe).join('|');
+      denyRe = new RegExp(`(?<![A-Za-z0-9_])(${alt})(?![A-Za-z0-9_])`, 'gi');
+    }
+  }
+
+  let yaml;
+  try {
+    const r = await fetch(OPENAPI_URL, { headers: { 'user-agent': 'conyr-skills-check' }, signal: AbortSignal.timeout(30000) });
+    if (r.status !== 200) stop(`${OPENAPI_URL} answered ${r.status}`);
+    yaml = await r.text();
+  } catch (e) {
+    stop(`cannot read ${OPENAPI_URL}: ${e.cause?.code ?? e.message}`);
+  }
+  const routes = readOpenapi(yaml);
+  if (!routes.length) stop(`found no /v1 route with an x-tier in ${OPENAPI_URL}`);
+
+  const all = files(root, root);
+  const skills = all.filter((f) => /^skills\/[^/]+\/SKILL\.md$/.test(f));
+  const toFetch = new Map();
+  let named = 0;
+  for (const rel of all) {
+    const text = fs.readFileSync(path.join(root, rel), 'utf8');
+    const isSkill = skills.includes(rel);
+    if (isSkill) checkFormat(rel, text);
+    if (isSkill || rel === 'README.md') {
+      checkRoutes(rel, text, routes, isSkill);
+      named += mentions(text).length;
+    }
+    if (rel === 'README.md' || rel === 'server.json' || rel.startsWith('skills/')) checkLinks(rel, text, toFetch);
+    if (denyRe) checkDeny(rel, text, denyRe);
+  }
+
+  const hrefs = [...toFetch.keys()];
+  for (let i = 0; i < hrefs.length; i += 4) {
+    const batch = hrefs.slice(i, i + 4);
+    const answers = await Promise.all(batch.map(statusOf));
+    batch.forEach((href, j) => {
+      if (answers[j] === 200) return;
+      for (const { rel, line, written } of toFetch.get(href)) {
+        problem('link-status', rel, line, `${written} answered ${answers[j]}${written === href ? '' : ` (fetched as ${href})`}`);
+      }
+    });
+  }
+
+  if (problems.length) {
+    console.log(problems.join('\n'));
+    console.log(`${problems.length} problem${problems.length === 1 ? '' : 's'}`);
+    process.exit(1);
+  }
+  console.log(
+    `ok: ${skills.length} skill${skills.length === 1 ? '' : 's'}, ${named} route mentions checked against ${routes.length} ` +
+      `/v1 routes in ${OPENAPI_URL}, ${hrefs.length} conyr.ai links answered 200, ` +
+      (deny ? `deny list: ${denyCount} terms` : 'no deny list given'),
+  );
+}
+
+main();

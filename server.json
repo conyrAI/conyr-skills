@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "ai.conyr/solana-intelligence",
+  "title": "Conyr Solana Intelligence",
+  "description": "Solana coin and wallet intelligence: bundles, buyer quality, wallet skill, funding and coordination.",
+  "version": "1.0.0",
+  "websiteUrl": "https://conyr.ai/api?utm_source=mcp-registry&utm_medium=listing",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.conyr.ai/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer followed by a Conyr API key. Get a free key at https://conyr.ai/api?utm_source=mcp-registry&utm_medium=listing",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

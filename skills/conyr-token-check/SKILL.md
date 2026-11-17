@@ -38,7 +38,7 @@ body, then the HTTP status code on its own last line.
 
 | Route | Plan | What it answers |
 |---|---|---|
-| `/v1/token/{mint}/bundles/summary` | Free | Coordinated bundles on the coin: how many, how many still open, the leading type |
+| `/v1/token/{mint}/bundles/summary` | Free | Coordinated bundles on the coin: how many, how many still open, the leading type, and the share of its supply they hold |
 | `/v1/token/{mint}/buyer-quality` | Free | What kinds of wallets bought it, by wallet count and USD volume |
 | `/v1/token/{mint}/info` | Layer 1 | Conyr's validated, suspicious and high-risk flags for the coin |
 | `/v1/token/{mint}/liquidity` | Layer 1 | Pool depth, LP burn or lock, dump impact and how much SOL can exit |
@@ -80,7 +80,8 @@ Report only the fields below; leave the others out.
 **`bundles/summary`**
 
 - `bundle_count`: coordinated bundles Conyr has found on this coin. `open_bundle_count`: how many of them are still open.
-- Leave `bundled_supply_pct` out for now.
+- `bundled_supply_pct`: the share of the coin's total supply those bundles hold, as a percent from 0 to 100:
+  `18.5` means 18.5%, and `0.04` means 0.04%, not 4%.
 - `bundled_realized_pnl_usd`: the bundles' realized profit and loss, in USD.
 - `dominant_bundle_type`: the leading bundle type on this coin, or null when there is none. One of:
   - `JitoMev`: trades side by side in one slot, as in Jito or MEV execution

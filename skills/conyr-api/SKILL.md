@@ -68,8 +68,9 @@ before it.
 - The per-minute limits are per key, and the MCP server keeps its own per-minute budget for each key, apart from REST.
 - A month's calls are counted per account: its REST calls and MCP messages (a handshake and a tool list count too) on
   all of its keys, in the UTC month. Calls answered with a status of 400 or more do not count. From 2026-12-01, a Free
-  account past 10,000 is refused until the 1st (section 6). REST answers to a Free key carry the count so far in
-  `X-Conyr-Month-Used` (up to 30 seconds old), with `X-Conyr-Month-Limit` and `X-Conyr-Month-Reset`.
+  account past 10,000 is refused until the 1st (section 6). REST answers to a Free key of your own carry the account's
+  count so far in `X-Conyr-Month-Used` (usually up to about 30 seconds behind), with `X-Conyr-Month-Limit` and
+  `X-Conyr-Month-Reset`.
 - A paid plan is not cut off at its number: past it, Conyr gets in touch about a larger plan.
 - A WebSocket connection carries at most 50 subscriptions. The Free plan cannot open one.
 
@@ -94,9 +95,10 @@ For a client that only runs local servers: `npx -y mcp-remote https://mcp.conyr.
 A tool above the key's plan answers with `isError: true` and
 `{"error":"tier_insufficient","requiredTier":"Layer 2","tool":"query_wallet_quality","upgradeUrl":"<link>","yourTier":"Free"}`,
 and its text line ends with the same link. From 2026-12-01, once a Free account has used its 10,000 calls in a month,
-every tool call answers with `isError: true` and `error: "month_limit"`, with `limit`, `used`, `resetsAt` and
-`upgradeUrl`; the handshake and the tool list still answer. Do not call a tool again before `resetsAt`, and report the
-link in `upgradeUrl`. Object results carry `evidenceUrl`, a page a person can open.
+the three Free tools answer with `isError: true` and `error: "month_limit"`, with `limit`, `used`, `resetsAt` and
+`upgradeUrl` (a tool above the plan still answers `tier_insufficient`); the handshake and the tool list still answer. Do
+not call a tool again before `resetsAt`, and report the link in `upgradeUrl`. Object results carry `evidenceUrl`, a page
+a person can open.
 
 ## 5. The WebSocket
 

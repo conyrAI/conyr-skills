@@ -204,14 +204,15 @@ Report only the fields below. An empty list, a null or `degraded: true` is not a
 
 ## 4. When a call is refused
 
-Read the status code on the last line. From a 403, also read `required_tier` in the body. Never depend on the wording of
-an error message: it can change.
+Read the status code on the last line. From a 403, also read `required_tier` in the body; from a 429, `reason`. Never
+depend on the wording of an error message: it can change.
 
 | Status | Meaning | What to say |
 |---|---|---|
 | 401 | No key, or a wrong or revoked one | Sign up at https://conyr.ai/api?utm_source=skill&utm_medium=agent&utm_content=conyr-coordination then create a key at https://conyr.ai/app/profile?tab=api&utm_source=skill&utm_medium=agent&utm_content=conyr-coordination and put it in `CONYR_API_KEY`. |
 | 403 | The key's plan does not include this route | Name the plan in `required_tier` and give the plans link https://conyr.ai/api?utm_source=skill&utm_medium=agent&utm_content=conyr-coordination. Do not retry. |
 | 429 | Too many calls this minute | The limit is per minute: wait a minute, or look at a higher plan at the plans link. |
+| 429 with `reason` `month_limit` | The key is on the Free plan, and its account has used its calls for the month | This skill needs the Layer 3 plan: say so, give the plans link, and do not retry. |
 
 Any other status (400 for a malformed address, ID or window, 404, 500, 503): say the call failed with that status and do
 not fill in the missing answer.

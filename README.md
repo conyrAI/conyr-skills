@@ -45,15 +45,19 @@ The skills use `CONYR_API_KEY` whenever it is set.
 
 ## Plans
 
-Read on 2026-11-17 from https://conyr.ai/api?utm_source=github&utm_medium=readme&utm_content=conyr-skills, the place to
-check them again. Each paid plan includes everything in the plans listed before it.
+Read on 2026-11-18 from https://conyr.ai/api?utm_source=github&utm_medium=readme&utm_content=conyr-skills, the place to
+check them again; the calls a month were set on 2026-11-17. Each paid plan includes everything in the plans listed
+before it.
 
-| Plan | Price a month | Billed yearly, a month | REST calls a minute | WebSocket connections |
-|---|---|---|---|---|
-| Free | $0 | | 10 | none |
-| Layer 1 | $29 | $23 | 100 | 5 |
-| Layer 2 | $75 | $60 | 300 | 20 |
-| Layer 3 | $149 | $119 | 600 | 50 |
+| Plan | Price a month | Billed yearly, a month | REST calls a minute | Calls a month | WebSocket connections |
+|---|---|---|---|---|---|
+| Free | $0 | | 10 | 10,000, then refused until the 1st | none |
+| Layer 1 | $29 | $23 | 100 | 500,000 included | 5 |
+| Layer 2 | $75 | $60 | 300 | 1,500,000 included | 20 |
+| Layer 3 | $149 | $119 | 600 | 3,000,000 included | 50 |
 
-Platform Feed, $399 a month: every realtime push channel and Layer 3 API access, with white-label rights. Enterprise,
-from $999 a month: custom limits.
+A month's calls are an account's REST calls and MCP messages together, on all of its keys. The Free plan's stop starts
+on 2026-12-01. A paid plan is not cut off at its number: past it, Conyr gets in touch about a larger plan.
+
+Platform Feed, $399 a month: every realtime push channel and Layer 3 API access, with white-label rights, and
+10,000,000 calls a month included. Enterprise, from $999 a month: custom limits.

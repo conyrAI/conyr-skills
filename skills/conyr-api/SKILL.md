@@ -51,20 +51,26 @@ npx @openapitools/openapi-generator-cli generate -i https://conyr.ai/docs/openap
 
 ## 3. Plans and limits
 
-Read on 2026-11-17 from https://conyr.ai/api?utm_source=skill&utm_medium=agent&utm_content=conyr-api, which is the place
-to check them again. Each paid plan includes everything in the plans listed before it.
+Read on 2026-11-18 from https://conyr.ai/api?utm_source=skill&utm_medium=agent&utm_content=conyr-api, which is the place
+to check them again; the calls a month were set on 2026-11-17. Each paid plan includes everything in the plans listed
+before it.
 
-| Plan | Price a month | Billed yearly, a month | REST calls a minute | WebSocket connections | Adds |
-|---|---|---|---|---|---|
-| Free | $0 | | 10 | none | Bundle summary and buyer quality for any coin |
-| Layer 1 | $29 | $23 | 100 | 5 | Coin info, liquidity, holders, trades, candles; trade and candle streams |
-| Layer 2 | $75 | $60 | 300 | 20 | Wallet reads: quality, PnL, positions, labels, identity, funding source, similar wallets, address labels, leaderboard; wallet streams |
-| Layer 3 | $149 | $119 | 600 | 50 | Bundles in full, funding abuse, wash trades, liquidity events, follows, clusters, campaigns, crowd; security and coordination streams |
+| Plan | Price a month | Billed yearly, a month | REST calls a minute | Calls a month | WebSocket connections | Adds |
+|---|---|---|---|---|---|---|
+| Free | $0 | | 10 | 10,000, then refused until the 1st | none | Bundle summary and buyer quality for any coin |
+| Layer 1 | $29 | $23 | 100 | 500,000 included | 5 | Coin info, liquidity, holders, trades, candles; trade and candle streams |
+| Layer 2 | $75 | $60 | 300 | 1,500,000 included | 20 | Wallet reads: quality, PnL, positions, labels, identity, funding source, similar wallets, address labels, leaderboard; wallet streams |
+| Layer 3 | $149 | $119 | 600 | 3,000,000 included | 50 | Bundles in full, funding abuse, wash trades, liquidity events, follows, clusters, campaigns, crowd; security and coordination streams |
 
 - Platform Feed, $399 a month ($3,830 billed yearly): every realtime push channel and Layer 3 API access, with
-  white-label rights for a product.
+  white-label rights for a product, and 10,000,000 calls a month included.
 - Enterprise, from $999 a month: 3,000 or more REST calls a minute, unlimited WebSocket connections, custom limits.
-- Limits are per key. The MCP server keeps its own per-minute budget for each key, apart from REST.
+- The per-minute limits are per key, and the MCP server keeps its own per-minute budget for each key, apart from REST.
+- A month's calls are counted per account: its REST calls and MCP messages (a handshake and a tool list count too) on
+  all of its keys, in the UTC month. Calls answered with a status of 400 or more do not count. From 2026-12-01, a Free
+  account past 10,000 is refused until the 1st (section 6). REST answers to a Free key carry the count so far in
+  `X-Conyr-Month-Used` (up to 30 seconds old), with `X-Conyr-Month-Limit` and `X-Conyr-Month-Reset`.
+- A paid plan is not cut off at its number: past it, Conyr gets in touch about a larger plan.
 - A WebSocket connection carries at most 50 subscriptions. The Free plan cannot open one.
 
 ## 4. The MCP server
@@ -86,7 +92,11 @@ For clients configured in JSON (Cursor and others):
 For a client that only runs local servers: `npx -y mcp-remote https://mcp.conyr.ai/mcp --header "Authorization: Bearer YOUR_KEY"`.
 
 A tool above the key's plan answers with `isError: true` and
-`{"error":"tier_insufficient","requiredTier":"Layer 2","tool":"query_wallet_quality","yourTier":"Free"}`. Object results carry `evidenceUrl`, a page a person can open.
+`{"error":"tier_insufficient","requiredTier":"Layer 2","tool":"query_wallet_quality","upgradeUrl":"<link>","yourTier":"Free"}`,
+and its text line ends with the same link. From 2026-12-01, once a Free account has used its 10,000 calls in a month,
+every tool call answers with `isError: true` and `error: "month_limit"`, with `limit`, `used`, `resetsAt` and
+`upgradeUrl`; the handshake and the tool list still answer. Do not call a tool again before `resetsAt`, and report the
+link in `upgradeUrl`. Object results carry `evidenceUrl`, a page a person can open.
 
 ## 5. The WebSocket
 
@@ -106,15 +116,20 @@ The stream is not a replayable log: a slow reader can miss events. Take a REST s
 
 - Success is JSON. An error is `{"error":"...","code":<status>}`. A `null` body, an empty list and an error are three
   different answers: keep them apart, and never read null or empty as a clean verdict.
-- Read the status code and, from a 403, `required_tier`. Never parse the wording of `error`: it can change.
+- Read the status code; from a 403, `required_tier`; from a 429, `reason`. Never parse the wording of `error`: it can
+  change.
+- `upgrade_url` is a link on conyr.ai: for a Free key, checkout for the plan it names; for a paid key, the account's API
+  tab. Report it as it is. A Layer 3 or Enterprise key at its minute limit gets none.
 
-The three refusals, as the API sends them today:
+The refusals, as the API sent them on 2026-11-18 (`<link>` stands for the `upgrade_url`). The monthly stop starts on
+2026-12-01, so its body is from a run of the same API code in a test month:
 
 | Status | Body | What the code should do |
 |---|---|---|
 | 401 | `{"code":401,"error":"Missing or invalid Authorization header"}` with no key; `{"code":401,"error":"Invalid API key"}` with a wrong or revoked one | Stop and ask for a key (the links in section 1). |
-| 403 | `{"code":403,"error":"Endpoint requires Layer 2 tier (resolved: Free)","required_tier":"Layer 2","resolved_tier":"Free"}` | Do not retry. Report `required_tier` and the plans link https://conyr.ai/api?utm_source=skill&utm_medium=agent&utm_content=conyr-api |
-| 429 | `{"code":429,"error":"rate limit exceeded"}`, with no retry header | Back off until the next minute; for steady load, use a plan with a higher limit. |
+| 403 | `{"code":403,"error":"Endpoint requires Layer 2 tier (resolved: Free)","reason":"plan_required","required_tier":"Layer 2","resolved_tier":"Free","upgrade_url":"<link>"}` | Do not retry. Report `required_tier` and the link in `upgrade_url`. |
+| 429, `reason` `minute_limit` | `{"code":429,"error":"rate limit exceeded","limit_per_minute":10,"reason":"minute_limit","retry_after_seconds":5,"upgrade_url":"<link>"}`, with a `Retry-After` header of the same seconds | Wait `retry_after_seconds`, then retry. For steady load, use a plan with a higher limit (`upgrade_url`, when present). |
+| 429, `reason` `month_limit` | `{"code":429,"error":"Monthly free limit reached","limit":10000,"reason":"month_limit","resets_at":"2026-12-01T00:00:00Z","retry_after_seconds":1131712,"upgrade_url":"<link>","used":10004}`, with `Retry-After` | Do not retry before `resets_at`: the account's free calls for the month are used. Report `used` and `limit`, the date in `resets_at` and the link in `upgrade_url`. |
 
 Other statuses: 400 for bad input, 404 when there is no such resource, 500 and 503 for a server or dependency failure.
 

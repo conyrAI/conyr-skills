@@ -99,7 +99,8 @@ Each prints one JSON document. The API's answer is under `data`; read only the f
 **`trades`** (Layer 1)
 
 - Each trade: `timestamp`, `wallet_address`, `direction` (`buy` or `sell`), `dex_name`, `signature`,
-  `base_price_usd` (the swap's value in USD), `base_amount` (the SOL side in lamports: divide by 1,000,000,000 for SOL),
+  `base_price_usd` (the swap's value in USD), `base_amount` (the other side in the smallest unit of `base_mint`: divide by
+  10 to the power of `base_decimals`; SOL is 9, USDC 6; `base_decimals` is null for a rare other quote token),
   `total_fees_usd` (network and platform fees, in USD).
 - `token_amount` is in the coin's smallest unit, not whole tokens, and this route does not give the coin's decimals.
   Give trade sizes in USD or SOL.

@@ -98,14 +98,14 @@ Report only the fields below. An empty list, a null or `degraded: true` is not a
 
 - `bundle_type`, one of:
   - `JitoMev`: trades side by side in one slot, as in Jito or MEV execution
-  - `JitoSequential`: sequential Jito execution
   - `SameSlotBuyCohort` / `SameSlotSellCohort`: several wallets buying, or selling, in the same slot
   - `LaunchSlotBurst`: a coordinated burst at the coin's launch or first trading slot
   - `MultiSlotBuyCohort`: coordinated buys spread over nearby slots
+  - `MultiSell`: several wallets selling the coin in one transaction
   - `SybilPoisoning`: several wallets funded from the same source, buying together
   - `CexCoordinated`: wallets funded from exchange hot wallets, acting together
   - `SyntheticSwarm`: clusters of wallets with the same structure
-  - `Hybrid`: more than one of the above
+  - `Synthetic`: more than one of the above
 - `status`: `active`, `dormant`, `dumping`, `derisked`, `exited`, `rugged` or `merged`. Give it as it comes.
 - `leader_wallet`, `member_count_total`, `member_count_active`, `chain_balance_ui` (whole tokens the members hold now),
   `total_tokens_bought_ui`, `total_tokens_sold_ui` (whole tokens), `total_usd_invested`, `total_usd_returned`,

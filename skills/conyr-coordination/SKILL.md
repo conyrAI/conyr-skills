@@ -94,6 +94,10 @@ curl -sS -w '\n%{http_code}\n' -H "Authorization: Bearer $KEY" "https://api.cony
 
 Report only the fields below. An empty list, a null or `degraded: true` is not a clean verdict: say what is missing.
 
+Times are UTC in three shapes, none of them RFC 3339 here: fields ending in `TsMs` or `Ms`, and `ts_ms`, are Unix
+milliseconds (a number); `created_at`, `flagged_time` and `rugged_time` are text like `2026-11-23 16:31:15.760402+00`;
+`first_buy_ts` and `detected_at` are text like `2026-11-23 16:44:38.092` (a space, no zone).
+
 **`bundles` and `bundles/{bundle_id}`**
 
 - `bundle_type`, one of:
@@ -167,7 +171,8 @@ Report only the fields below. An empty list, a null or `degraded: true` is not a
 - `entity-concentration`: `totalWallets`, `distinctActors` (the buyers, counted once per cluster they belong to),
   `totalVolumeUsd`, `entityVolumeUsd`, `entityVolumeShare` (fraction from 0 to 1), `topActors`.
 - `late-retail`: buys made in the 10 minutes after a profitable wallet sold. `eliteSells` (those sells), `lateBuyers`
-  (a count of buys, not of distinct wallets), `lateBuyerVolumeUsd`, `avgLagSeconds`, `shareUnprofitable` (the share of
+  (a count of buys, not of distinct wallets), `lateBuyerWallets` (the distinct wallets behind those buys, profitable ones
+  included), `lateBuyerVolumeUsd`, `avgLagSeconds`, `shareUnprofitable` (the share of
   those buys made by wallets not labeled as earners, unknown ones included; a fraction from 0 to 1).
 - `copy-originator[]`: `candidateLeader`, `followerBuysInCluster`, `meanConfidence`.
 

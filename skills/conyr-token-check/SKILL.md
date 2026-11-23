@@ -32,6 +32,8 @@ npx -y conyr-cli@1 token '<mint address>' --via conyr-token-check
 
 - The tool's lines are the facts. Pass them on with the meanings it prints for the bundle type and each kind of
   buyer. Add no number of your own, and do not fill in anything the answer leaves out.
+- The bundle lines count the bundles Conyr tracks on the coin now. That count starts again from zero when Conyr's
+  detector restarts, so a low count is not a sign that bundles closed, and zero is not a sign the coin is safe.
 - The share of supply is a percent: `0.04%` means 0.04%, not 4%.
 - Give the coin's page from the answer.
 - When the answer says it used Conyr's shared demo key, end with its line about a free key of their own.
@@ -40,7 +42,7 @@ npx -y conyr-cli@1 token '<mint address>' --via conyr-token-check
 
 | Route | Plan | What it answers |
 |---|---|---|
-| `/v1/token/{mint}/bundles/summary` | Free | Called by `conyr token`: bundles on the coin, how many are still open, the leading type, the share of supply they hold |
+| `/v1/token/{mint}/bundles/summary` | Free | Called by `conyr token`: the bundles Conyr tracks on the coin now, how many are still open, the leading type, the share of supply they hold |
 | `/v1/token/{mint}/buyer-quality` | Free | Called by `conyr token`: what kinds of wallets bought it, by wallet count and USD volume |
 | `/v1/token/{mint}/info` | Layer 1 | Conyr's validated, suspicious and high-risk flags for the coin |
 | `/v1/token/{mint}/liquidity` | Layer 1 | Pool depth, LP burn or lock, dump impact and how much SOL can exit |
@@ -98,7 +100,7 @@ Each prints one JSON document. The API's answer is under `data`; read only the f
 
 **`trades`** (Layer 1)
 
-- Each trade: `timestamp`, `wallet_address`, `direction` (`buy` or `sell`), `dex_name`, `signature`,
+- Each trade: `timestamp` (UTC, as `YYYY-MM-DD HH:MM:SS.mmm` (a space, milliseconds, no zone; not RFC 3339)), `wallet_address`, `direction` (`buy` or `sell`), `dex_name`, `signature`,
   `base_price_usd` (the swap's value in USD), `base_amount` (the other side in the smallest unit of `base_mint`: divide by
   10 to the power of `base_decimals`; SOL is 9, USDC 6; `base_decimals` is null for a rare other quote token),
   `total_fees_usd` (network and platform fees, in USD).
@@ -109,7 +111,7 @@ Each prints one JSON document. The API's answer is under `data`; read only the f
 
 - `timeframe`: `1s`, `1m`, `5m`, `15m` or `1h`. `view=filtered` leaves out wash trades and bot activity; `view=full`
   keeps every swap. `from` and `to` are Unix milliseconds.
-- Each candle: `bucket` (start time), `open`, `high`, `low`, `close` and `vwap` (USD per whole token), `volume_usd`,
+- Each candle: `bucket` (start time, UTC, as `YYYY-MM-DD HH:MM:SS+00`; not RFC 3339), `open`, `high`, `low`, `close` and `vwap` (USD per whole token), `volume_usd`,
   `num_trades`.
 
 ## 4. When the tool reports a refusal

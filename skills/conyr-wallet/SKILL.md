@@ -95,7 +95,7 @@ is never a clean verdict.
 
 **`positions`** (at most 100 rows)
 
-- `token_mint`, `status` (`OPEN`, `PARTIAL` or `CLOSED`), `entry_timestamp` (Unix milliseconds), `exit_count`,
+- `token_mint`, `status` (`OPEN`, `PARTIAL` or `CLOSED`), `entry_timestamp` (Unix milliseconds, a number), `exit_count`,
   `entry_price_usd` (what the position cost in USD when it was opened; not a per-token price).
 - `original_amount` and `remaining_amount` are in the coin's smallest unit, not whole tokens. Give the share still held
   (`remaining_amount` divided by `original_amount`) rather than a token count.
@@ -103,7 +103,7 @@ is never a clean verdict.
 
 **`trades`** (one row per exit)
 
-- `token_mint`, `entry_timestamp`, `exit_timestamp`, `hold_time_seconds`, `exit_type` (`FULL` or `PARTIAL`),
+- `token_mint`, `entry_timestamp` and `exit_timestamp` (UTC, as `YYYY-MM-DD HH:MM:SS.mmm` (a space, milliseconds, no zone; not RFC 3339)), `hold_time_seconds`, `exit_type` (`FULL` or `PARTIAL`),
   `realized_pnl_usd`, `realized_pnl_sol`, `percentage_gain` (the exit's return, in percent), `entry_signature`,
   `exit_signature`.
 - `entry_price_usd` and `exit_price_usd` are dollar amounts, not per-token prices, and a partial exit pairs the whole
@@ -152,7 +152,7 @@ is never a clean verdict.
 
 - `root_entity`: the name of the source its SOL traces back to, such as an exchange; null when no source was found.
   `root_source`: that source's address. `hops`: transfers between that source and the wallet. `direct_funder`: the
-  wallet that funded it directly. `last_funded_ts`: the last funding time.
+  wallet that funded it directly. `last_funded_ts`: the last funding time, UTC, as `YYYY-MM-DD HH:MM:SS.mmm` (a space, milliseconds, no zone; not RFC 3339); empty when unknown.
 - `root_address_label`, `direct_funder_address_label`: what the source and the direct funder are, when they are services
   or carry the OFAC mark.
 - No root found is not a clean verdict.
